@@ -1,5 +1,6 @@
 # Langfuse Helm Chart Configuration
 
+
 # -- Override the name for the selector labels, defaults to the chart name
 nameOverride: ""
 
@@ -41,13 +42,31 @@ langfuse:
     secretKeyRef:
       name: "langfuse-secrets-prod"
       key: "SALT"
-  
+      
   # -- Langfuse EE license key.
   licenseKey:
     value: ""
     secretKeyRef:
       name: ""
       key: ""
+  # New change while upgrade ==========>
+  # -- EE: Langfuse allowed organization creators. See [documentation](https://langfuse.com/self-hosting/organization-creators)
+  allowedOrganizationCreators: []
+
+  # -- Authentication and SSO settings:
+  # -- If you want to disable username/password login, set auth.disableUsernamePassword to true.
+  # -- Refer to [documentation](https://langfuse.com/self-hosting/authentication-and-sso) for available keys for each provider.
+  # -- For each provider, add it to auth.providers, and add respective configuration options under it.
+  # -- For options, use the last part (after provider name) of the respective environment variable's name, in camelCase.
+  # -- For example, to use Azure AD as your SSO provider, use the following lines:
+  # auth:
+  #   disableUsernamePassword: true
+  #   providers:
+  #     azureAd:
+  #       clientId: "<YOUR CLIENT ID>"
+  #       clientSecret: "<YOUR CLIENT SECRET>"
+  #       tenantId: "<YOUR TENANT ID>"
+  # New change while upgrade <==========
 
   # -- Used to encrypt sensitive data. Must be 256 bits (64 string characters in hex format). Generate via `openssl rand -hex 32`.
   encryptionKey:
@@ -63,7 +82,7 @@ langfuse:
     signUpDisabled: false
     # -- Enable experimental features
     experimentalFeaturesEnabled: false
-  
+
   # -- Node.js environment to use for all langfuse deployments
   nodeEnv: production
 
@@ -74,7 +93,13 @@ langfuse:
     annotations: {}
     # -- Override the name of the service account to use, discovered automatically if not set
     name: ""
-
+  # New change while upgrade ==========>
+  smtp:
+    # -- SMTP connection URL. See [documentation](https://langfuse.com/self-hosting/transactional-emails)
+    connectionUrl: ""
+    # -- From address for emails. Required if connectionUrl is set.
+    fromAddress: ""
+  # New change while upgrade <==========
   ingress:
     # -- Set to `true` to enable the ingress resource
     enabled: true
@@ -131,6 +156,8 @@ langfuse:
     strategy: {}
   # -- Number of replicas to use for all langfuse deployments. Can be overridden by the individual deployments
   replicas: 1
+  # -- Number of old ReplicaSets to retain to allow rollback. Can be overridden by the individual deployments
+  revisionHistoryLimit: 10
   # -- Resources for all langfuse deployments. Can be overridden by the individual deployments
   resources:
     requests:
@@ -158,6 +185,9 @@ langfuse:
   # -- Allows additional volume mounts to be added to all langfuse deployments
   extraVolumeMounts: []
 
+  # -- Allows additional lifecycle hooks to be added to all langfuse deployments
+  extraLifecycle: {}
+
   # Web deployment configuration
   web:
     image:
@@ -170,6 +200,8 @@ langfuse:
       # -- The pull secrets to use for the langfuse web pods. Using `langfuse.image.pullSecrets` if not set.
       pullSecrets: Null
     deployment:
+      # -- Additional labels for the langfuse web deployment
+      additionalLabels: {}
       # -- Annotations for the web deployment
       annotations: {}
       # -- Deployment strategy for the web deployment. Overrides the global deployment strategy
@@ -179,11 +211,22 @@ langfuse:
       annotations: {}
       # -- Labels for the web pods
       labels: {}
+
+      # New change while upgrade =====>
+      # -- Topology spread constraints for the web pods. Overrides the global topologySpreadConstraints
+      topologySpreadConstraints: null
+      # -- Allows additional containers to be added to all langfuse web pods
+      extraContainers: []
+      # -- List of additional environment variables to be added to all langfuse web pods. See [documentation](https://langfuse.com/docs/deployment/self-host#configuring-environment-variables) for details.
+      additionalEnv: []
+      # New change while upgrade <=======
     service:
       # -- The type of service to use for the langfuse web application
       type: ClusterIP
       # -- The port to use for the langfuse web application
       port: 3000
+      # -- The external port that will be exposed by the service. Falls back to `port` if not set.
+      externalPort: null
       # -- The node port to use for the langfuse web application
       nodePort: null
       # -- Additional labels for the langfuse web application service
@@ -196,6 +239,9 @@ langfuse:
 
     # -- Number of replicas to use if HPA is not enabled. Defaults to the global replicas
     replicas: null
+
+    # -- Number of old ReplicaSets to retain to allow rollback.
+    revisionHistoryLimit: null
 
     # KEDA ScaledObject configuration
     keda:
@@ -242,7 +288,7 @@ langfuse:
       updatePolicy:
         # -- The update policy mode for the langfuse web pods
         updateMode: Auto
-    
+
     # -- Adding records to /etc/hosts in the pod's network.
     hostAliases: []
     
@@ -297,6 +343,8 @@ langfuse:
       # -- The pull secrets to use for the langfuse worker pods. Using `langfuse.image.pullSecrets` if not set.
       pullSecrets: Null
     deployment:
+      # -- Additional labels for the worker deployment
+      additionalLabels: {}
       # -- Annotations for the worker deployment
       annotations: {}
       # -- Deployment strategy for the worker deployment. Overrides the global deployment strategy
@@ -306,12 +354,23 @@ langfuse:
       annotations: {}
       # -- Labels for the worker pods
       labels: {}
+      # New change while upgrade =====>
+      # -- Topology spread constraints for the worker pods. Overrides the global topologySpreadConstraints
+      topologySpreadConstraints: null
+      # -- Allows additional containers to be added to all langfuse worker pods
+      extraContainers: []
+      # -- List of additional environment variables to be added to all langfuse worker pods. See [documentation](https://langfuse.com/docs/deployment/self-host#configuring-environment-variables) for details.
+      additionalEnv: []
+      # New change while upgrade <=====
 
     # -- Resources for the langfuse worker pods. Defaults to the global resources
     resources: {}
 
     # -- Number of replicas to use if HPA is not enabled. Defaults to the global replicas
     replicas: null
+
+    # -- Number of old ReplicaSets to retain to allow rollback.
+    revisionHistoryLimit: null
 
     # KEDA ScaledObject configuration
     keda:
@@ -358,7 +417,7 @@ langfuse:
       updatePolicy:
         # -- The update policy mode for the langfuse worker pods
         updateMode: Auto
-    
+
     livenessProbe:
       # -- Initial delay seconds for livenessProbe.
       initialDelaySeconds: 20
@@ -424,6 +483,11 @@ postgresql:
   # -- If your database user lacks the CREATE DATABASE permission, you must create a shadow database and configure the "SHADOW_DATABASE_URL". This is often the case if you use a Cloud database. Refer to the Prisma docs for detailed instructions.
   shadowDatabaseUrl: ""
 
+  # image:
+  #   # -- Overwrite default repository of helm chart to point to non-paid bitnami images.
+  #   repository: bitnamilegacy/postgresql
+  #   # image: docker.io/bitnami/postgresql:17.3.0-debian-12-r1
+
   # Authentication configuration
   auth:
     # -- Username to use to connect to the postgres database deployed with Langfuse. In case `postgresql.deploy` is set to `true`, the user will be created automatically.
@@ -439,7 +503,7 @@ postgresql:
     database: langfuse_prod
     # -- Additional database connection arguments
     args: ""
-  
+
   # Migration configuration
   migration:
     # -- Whether to run automatic migrations on startup
@@ -461,7 +525,12 @@ redis:
   host: ""
   # -- Redis port to connect to.
   port: 6379
-  
+
+  # image:
+  #   # -- Overwrite default repository of helm chart to point to non-paid bitnami images.
+  #   repository: bitnamilegacy/valkey
+  #   # image: docker.io/bitnami/valkey:8.0.2-debian-12-r2
+
   # Redis TLS configuration
   tls:
     # -- Set to `true` to enable TLS/SSL encrypted connection to the Redis server
@@ -472,10 +541,12 @@ redis:
     certPath: ""
     # -- Path to the client private key file for mutual TLS authentication
     keyPath: ""
-  
+
   # Authentication configuration
   auth:
-    # -- Configure the password by value or existing secret reference
+    # -- Username to use to connect to the redis database deployed with Langfuse. In case `redis.deploy` is set to `true`, the user will be created automatically. Set to null for an empty username in the connection string.
+    username: "default"
+    # -- Configure the password by value or existing secret reference. Use URL-encoded passwords or avoid special characters in the password.
     password: ""
     # -- If you want to use an existing secret for the redis password, set the name of the secret here. (`redis.auth.password` will be ignored and picked up from this secret).
     existingSecret: "langfuse-secrets-prod"
@@ -513,7 +584,19 @@ clickhouse:
   httpPort: 8123
   # -- ClickHouse native port to connect to.
   nativePort: 9000
-  
+  #New change while upgrade ==========>
+  # image:
+  #   # -- Overwrite default repository of helm chart to point to non-paid bitnami images.
+  #   repository: bitnamilegacy/clickhouse
+  #   #  image: docker.io/bitnami/clickhouse:25.2.1-debian-12-r0
+  #New change while upgrade <==========
+
+  # zookeeper:
+  #   image:
+  #     # -- Overwrite default repository of helm chart to point to non-paid bitnami images.
+  #     repository: bitnamilegacy/zookeeper
+  #     # image: docker.io/bitnami/zookeeper:3.9.3-debian-12-r8
+
   # Authentication configuration
   auth:
     # -- Username for the ClickHouse user.
@@ -572,6 +655,19 @@ s3:
   deploy: false
   persistence:
     size: 50Gi
+  # New change while upgrade =====>    
+  # -- Storage provider to use. Options: s3 (default), azure, gcs
+  # -- When set to 'azure', enables Azure Blob Storage native integration
+  # -- When set to 'gcs', enables Google Cloud Storage native integration
+  # -- When set to 's3', uses S3-compatible interface (default behavior)
+  storageProvider: "s3"
+
+  # image:
+  #   # -- Overwrite default repository of helm chart to point to non-paid bitnami images.
+  #   repository: bitnamilegacy/minio
+  #   # image: docker.io/bitnami/minio:2024.12.18-debian-12-r1
+    # New change while upgrade <=====    
+
   # -- S3 bucket to use for all uploads. Can be overridden per upload type.
   bucket: "langfuse-production"
   # -- S3 region to use for all uploads. Can be overridden per upload type.
@@ -606,6 +702,18 @@ s3:
     secretKeyRef:
       name: "langfuse-secrets-prod"
       key: "S3_SECRET_ACCESS_KEY"
+
+  # Google Cloud Storage Configuration (only used when storageProvider is 'gcs')
+  # gcs:
+    # -- Google Cloud Storage credentials JSON or path to credentials file
+    # -- Can be the JSON content directly or a path to the credentials file
+    # -- If not provided, will fallback to environment credentials (e.g., service account attached to pods)
+    # -- Example: Set value to the JSON service account key content, or use secretKeyRef to reference a secret
+    # credentials:
+    #   value: ""
+    #   secretKeyRef:
+    #     name: ""
+    #     key: ""
 
   # S3 Concurrency Configuration
   concurrency:
@@ -706,6 +814,8 @@ s3:
     rootPassword: ""
     # -- If you want to use an existing secret for the root user password, set the name of the secret here. (`s3.auth.rootUser` and `s3.auth.rootPassword` will be ignored and picked up from this secret).
     existingSecret: ""
+    # -- Key where the Minio root user is being stored inside the existing secret `s3.auth.existingSecret`
+    rootUserSecretKey: ""
     # -- Key where the Minio root user password is being stored inside the existing secret `s3.auth.existingSecret`
     rootPasswordSecretKey: ""
   nodeSelector:
@@ -755,6 +865,10 @@ s3:
 #         name: langfuse-secrets-prod
 #         key: secret-access-key
 zookeeper:
+  # image:
+  #   # -- Overwrite default repository of helm chart to point to non-paid bitnami images.
+  #   repository: bitnamilegacy/zookeeper
+  #   # image: docker.io/bitnami/zookeeper:3.9.3-debian-12-r8
   nodeSelector:
     if-llm-workload: "true"  
   tolerations:
@@ -765,11 +879,14 @@ zookeeper:
     - key: "if-llm-workload"
       operator: "Equal"
       value: "true"
-      effect: "NoSchedule"   
+      effect: "NoSchedule"
 # Langfuse Production Configuration
 global:
   storageClass: "gp2"
 # Additional manifests
+  security:
+    # -- Allow insecure images to use bitnami legacy repository. Can be set to false if secure images are being used (Paid).
+    allowInsecureImages: true
 
 extraManifests: []
 # extraEnvVars:

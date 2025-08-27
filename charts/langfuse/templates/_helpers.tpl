@@ -80,21 +80,23 @@ Return Redis hostname
 {{- .Values.redis.host }}
 {{- else if .Values.redis.deploy }}
 {{- printf "%s-%s-primary" (include "langfuse.fullname" .) (default "redis" .Values.redis.nameOverride) -}}
-{{- else }}
-{{- fail "redis.host must be set when redis.deploy is false" }}
 {{- end }}
 {{- end }}
 
 {{/*
-Return ClickHouse hostname
+Return ClickHouse hostname (without protocol)
 */}}
 {{- define "langfuse.clickhouse.hostname" -}}
 {{- if .Values.clickhouse.host }}
-{{- .Values.clickhouse.host }}
+{{- if hasPrefix "http://" .Values.clickhouse.host -}}
+{{- trimPrefix "http://" .Values.clickhouse.host -}}
+{{- else if hasPrefix "https://" .Values.clickhouse.host -}}
+{{- trimPrefix "https://" .Values.clickhouse.host -}}
+{{- else -}}
+{{- .Values.clickhouse.host -}}
+{{- end -}}
 {{- else if .Values.clickhouse.deploy }}
 {{- printf "%s-clickhouse" (include "langfuse.fullname" .) -}}
-{{- else }}
-{{- fail "clickhouse.host must be set when clickhouse.deploy is false" }}
 {{- end }}
 {{- end }}
 
@@ -156,8 +158,9 @@ Get value of a specific environment variable from additionalEnv if it exists
 */}}
 {{- define "langfuse.databaseEnv" -}}
 {{- with (include "langfuse.getEnvVar" (dict "env" .Values.langfuse.additionalEnv "name" "DATABASE_URL")) -}}
-- name: DATABASE_URL
-  value: {{ . | quote }}
+{{/*
+    If DATABASE_URL is set, we do nothing in databaseEnv.
+*/}}
 {{- else -}}
 - name: DATABASE_HOST
   value: {{ include "langfuse.postgresql.hostname" . | quote }}
@@ -224,10 +227,24 @@ Get value of a specific environment variable from additionalEnv if it exists
 {{- end }}
 - name: TELEMETRY_ENABLED
   value: {{ .Values.langfuse.features.telemetryEnabled | quote }}
-- name: NEXT_PUBLIC_SIGN_UP_DISABLED
+- name: AUTH_DISABLE_SIGNUP
   value: {{ .Values.langfuse.features.signUpDisabled | quote }}
 - name: ENABLE_EXPERIMENTAL_FEATURES
   value: {{ .Values.langfuse.features.experimentalFeaturesEnabled | quote }}
+{{- if hasKey .Values.langfuse "smtp" }}
+{{- if .Values.langfuse.smtp.connectionUrl }}
+- name: SMTP_CONNECTION_URL
+  value: {{ .Values.langfuse.smtp.connectionUrl | quote }}
+- name: EMAIL_FROM_ADDRESS
+  value: {{ required "langfuse.smtp.fromAddress has to be set if langfuse.smtp.connectionUrl is configured" .Values.langfuse.smtp.fromAddress | quote }}
+{{- end }}
+{{- end }}
+{{- if hasKey .Values.langfuse "allowedOrganizationCreators" }}
+{{- if .Values.langfuse.allowedOrganizationCreators }}
+- name: LANGFUSE_ALLOWED_ORGANIZATION_CREATORS
+  value: {{ join "," .Values.langfuse.allowedOrganizationCreators | quote }}
+{{- end }}
+{{- end }}
 {{- end -}}
 
 {{/*
@@ -239,6 +256,18 @@ Get value of a specific environment variable from additionalEnv if it exists
   value: {{ .Values.langfuse.nextauth.url | quote }}
 - name: NEXTAUTH_SECRET
   {{- include "langfuse.getRequiredValueOrSecret" (dict "key" "langfuse.nextauth.secret" "value" .Values.langfuse.nextauth.secret) | nindent 2 }}
+{{- if and (hasKey .Values.langfuse "auth") (hasKey .Values.langfuse.auth "disableUsernamePassword") }}
+- name: AUTH_DISABLE_USERNAME_PASSWORD
+  value: {{ .Values.langfuse.auth.disableUsernamePassword | quote }}
+{{- end }}
+{{- if and (hasKey .Values.langfuse "auth") (hasKey .Values.langfuse.auth "providers") }}
+{{- range $providerName, $provider := .Values.langfuse.auth.providers }}
+{{- range $optionKey, $optionVal := $provider }}
+- name: AUTH_{{ $providerName | snakecase | upper }}_{{ $optionKey | snakecase | upper }}
+  value: {{ $optionVal | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end -}}
 
 {{/*
@@ -246,6 +275,7 @@ Get value of a specific environment variable from additionalEnv if it exists
     Compare with https://langfuse.com/self-hosting/configuration#environment-variables
 */}}
 {{- define "langfuse.redisEnv" -}}
+{{- if or .Values.redis.auth.existingSecret .Values.redis.auth.password }}
 - name: REDIS_PASSWORD
 {{- if .Values.redis.auth.existingSecret }}
   valueFrom:
@@ -255,10 +285,13 @@ Get value of a specific environment variable from additionalEnv if it exists
 {{- else }}
   value: {{ required "Using an existing secret or redis.auth.password is required" .Values.redis.auth.password | quote }}
 {{- end }}
+{{- end }}
+{{- if not (include "langfuse.getEnvVar" (dict "env" $.Values.langfuse.additionalEnv "name" "REDIS_CONNECTION_STRING")) }}
 - name: REDIS_TLS_ENABLED
   value: {{ .Values.redis.tls.enabled | quote }}
 - name: REDIS_CONNECTION_STRING
-  value: "{{ if .Values.redis.tls.enabled }}rediss{{ else }}redis{{ end }}://{{ .Values.redis.auth.username | default "default" }}:$(REDIS_PASSWORD)@{{ include "langfuse.redis.hostname" . }}:{{ .Values.redis.port }}/{{ .Values.redis.auth.database }}"
+  value: "{{ if .Values.redis.tls.enabled }}rediss{{ else }}redis{{ end }}://{{ .Values.redis.auth.username }}:$(REDIS_PASSWORD)@{{ include "langfuse.redis.hostname" . }}:{{ .Values.redis.port }}/{{ .Values.redis.auth.database }}"
+{{- end }}
 {{- if .Values.redis.tls.enabled }}
 {{- if .Values.redis.tls.caPath }}
 - name: REDIS_TLS_CA_PATH
@@ -277,31 +310,78 @@ Get value of a specific environment variable from additionalEnv if it exists
 
 
 {{/*
+Return ClickHouse protocol (http or https)
+*/}}
+{{- define "langfuse.clickhouse.protocol" -}}
+{{- if .Values.clickhouse.host }}
+{{- if hasPrefix "https://" .Values.clickhouse.host -}}
+{{- print "https" -}}
+{{- else -}}
+{{- print "http" -}}
+{{- end -}}
+{{- else -}}
+{{- print "http" -}}
+{{- end -}}
+{{- end }}
+
+{{/*
     Clickhouse related configurations by environment variables
     Compare with https://langfuse.com/self-hosting/configuration#environment-variables
 */}}
 {{- define "langfuse.clickhouseEnv" -}}
+{{- with (include "langfuse.getEnvVar" (dict "env" .Values.langfuse.additionalEnv "name" "CLICKHOUSE_MIGRATION_URL")) -}}
+{{/*
+  If CLICKHOUSE_MIGRATION_URL is set in additionalEnv, we do nothing for ClickHouse env vars, because we assume everything is configured via additionalEnv.
+*/}}
+{{- else -}}
+{{- if or .Values.clickhouse.migration.url .Values.clickhouse.host .Values.clickhouse.deploy }}
 - name: CLICKHOUSE_MIGRATION_URL
+  {{- if .Values.clickhouse.migration.url }}
+  value: {{ .Values.clickhouse.migration.url | quote }}
+  {{- else if .Values.clickhouse.host }}
+  value: "clickhouse://{{ .Values.clickhouse.host }}:{{ .Values.clickhouse.nativePort }}"
+  {{- else if .Values.clickhouse.deploy }}
   value: "clickhouse://{{ include "langfuse.clickhouse.hostname" . }}:{{ .Values.clickhouse.nativePort }}"
+  {{- end }}
+{{- end }}
+{{- if or (hasKey .Values.clickhouse.migration "ssl") .Values.clickhouse.deploy }}
+- name: CLICKHOUSE_MIGRATION_SSL
+  value: {{ .Values.clickhouse.migration.ssl | quote }}
+{{- end }}
+{{- if or .Values.clickhouse.host .Values.clickhouse.deploy }}
 - name: CLICKHOUSE_URL
-  value: "http://{{ include "langfuse.clickhouse.hostname" . }}:{{ .Values.clickhouse.httpPort }}"
+  value: "{{ include "langfuse.clickhouse.protocol" . }}://{{ include "langfuse.clickhouse.hostname" . }}:{{ .Values.clickhouse.httpPort }}"
+{{- end }}
+{{- if or .Values.clickhouse.auth.username .Values.clickhouse.deploy }}
 - name: CLICKHOUSE_USER
+  {{- if .Values.clickhouse.deploy }}
   value: {{ required "clickhouse.auth.username is required" .Values.clickhouse.auth.username | quote }}
+  {{- else }}
+  value: {{ .Values.clickhouse.auth.username | quote }}
+  {{- end }}
+{{- end }}
+{{- if or .Values.clickhouse.auth.existingSecret .Values.clickhouse.auth.password .Values.clickhouse.deploy }}
 - name: CLICKHOUSE_PASSWORD
 {{- if .Values.clickhouse.auth.existingSecret }}
   valueFrom:
     secretKeyRef:
       name: {{ .Values.clickhouse.auth.existingSecret }}
       key: {{ required "clickhouse.auth.existingSecretKey is required when using an existing secret" .Values.clickhouse.auth.existingSecretKey }}
-{{- else }}
+{{- else if .Values.clickhouse.auth.password }}
+  value: {{ .Values.clickhouse.auth.password | quote }}
+{{- else if .Values.clickhouse.deploy }}
   value: {{ required "Configuring an existing secret or clickhouse.auth.password is required" .Values.clickhouse.auth.password | quote }}
 {{- end }}
-{{- if $.Values.clickhouse.replicaCount | int | eq 1 }}
+{{- end }}
+{{- if and .Values.clickhouse.deploy ($.Values.clickhouse.replicaCount | int | eq 1) }}
 - name: CLICKHOUSE_CLUSTER_ENABLED
   value: "false"
 {{- end }}
+{{- if or (hasKey .Values.clickhouse.migration "autoMigrate") .Values.clickhouse.deploy }}
 - name: LANGFUSE_AUTO_CLICKHOUSE_MIGRATION_DISABLED
   value: {{ not .Values.clickhouse.migration.autoMigrate | quote }}
+{{- end }}
+{{- end }}
 {{- end -}}
 
 {{/*
@@ -324,6 +404,18 @@ Get value of a specific environment variable from additionalEnv if it exists
     Compare with https://langfuse.com/self-hosting/configuration#environment-variables
 */}}
 {{- define "langfuse.s3Env" -}}
+{{/* Storage provider specific environment variables */}}
+{{- if eq .Values.s3.storageProvider "azure" }}
+- name: LANGFUSE_USE_AZURE_BLOB
+  value: "true"
+{{- else if eq .Values.s3.storageProvider "gcs" }}
+- name: LANGFUSE_USE_GOOGLE_CLOUD_STORAGE
+  value: "true"
+{{- with (include "langfuse.getValueOrSecret" (dict "key" ".Values.s3.gcs.credentials" "value" .Values.s3.gcs.credentials)) }}
+- name: LANGFUSE_GOOGLE_CLOUD_STORAGE_CREDENTIALS
+  {{- . | nindent 2 }}
+{{- end }}
+{{- end }}
 - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
 {{- if $.Values.s3.deploy }}
   value: {{ required "s3.[eventUpload].bucket is required" (coalesce .Values.s3.eventUpload.bucket .Values.s3.bucket .Values.s3.defaultBuckets) | quote }}
@@ -338,9 +430,9 @@ Get value of a specific environment variable from additionalEnv if it exists
 - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
   value: {{ .Values.s3.eventUpload.region | default .Values.s3.region | quote }}
 {{- end }}
-{{- with (include "langfuse.s3.endpoint" .) }}
+{{- if or .Values.s3.eventUpload.endpoint .Values.s3.endpoint .Values.s3.deploy }}
 - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
-  value: {{ . | quote }}
+  value: {{ .Values.s3.eventUpload.endpoint | default .Values.s3.endpoint | default (include "langfuse.s3.endpoint" .) | quote }}
 {{- end }}
 {{- with (include "langfuse.getS3ValueOrSecret" (dict "key" "accessKeyId" "bucket" "eventUpload" "values" .Values.s3) ) }}
 - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
@@ -348,7 +440,14 @@ Get value of a specific environment variable from additionalEnv if it exists
 {{- else }}
 {{- if .Values.s3.deploy }}
 - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+  {{- if and .Values.s3.auth.existingSecret .Values.s3.auth.rootUserSecretKey }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.s3.auth.existingSecret }}
+      key: {{ .Values.s3.auth.rootUserSecretKey }}
+  {{- else }}
   value: {{ .Values.s3.auth.rootUser | quote }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- with (include "langfuse.getS3ValueOrSecret" (dict "key" "secretAccessKey" "bucket" "eventUpload" "values" .Values.s3) ) }}
@@ -357,7 +456,14 @@ Get value of a specific environment variable from additionalEnv if it exists
 {{- else }}
 {{- if .Values.s3.deploy }}
 - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+  {{- if and .Values.s3.auth.existingSecret .Values.s3.auth.rootPasswordSecretKey }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.s3.auth.existingSecret }}
+      key: {{ .Values.s3.auth.rootPasswordSecretKey }}
+  {{- else }}
   value: {{ .Values.s3.auth.rootPassword | quote }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- if or (hasKey .Values.s3.eventUpload "forcePathStyle") (hasKey .Values.s3 "forcePathStyle") }}
@@ -381,9 +487,9 @@ Get value of a specific environment variable from additionalEnv if it exists
 - name: LANGFUSE_S3_BATCH_EXPORT_REGION
   value: {{ .Values.s3.batchExport.region | default .Values.s3.region | quote }}
 {{- end }}
-{{- with (include "langfuse.s3.endpoint" .) }}
+{{- if or .Values.s3.batchExport.endpoint .Values.s3.endpoint .Values.s3.deploy }}
 - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
-  value: {{ . | quote }}
+  value: {{ .Values.s3.batchExport.endpoint | default .Values.s3.endpoint | default (include "langfuse.s3.endpoint" .) | quote }}
 {{- end }}
 {{- with (include "langfuse.getS3ValueOrSecret" (dict "key" "accessKeyId" "bucket" "batchExport" "values" .Values.s3) ) }}
 - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
@@ -391,7 +497,14 @@ Get value of a specific environment variable from additionalEnv if it exists
 {{- else }}
 {{- if .Values.s3.deploy }}
 - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
+  {{- if and .Values.s3.auth.existingSecret .Values.s3.auth.rootUserSecretKey }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.s3.auth.existingSecret }}
+      key: {{ .Values.s3.auth.rootUserSecretKey }}
+  {{- else }}
   value: {{ .Values.s3.auth.rootUser | quote }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- with (include "langfuse.getS3ValueOrSecret" (dict "key" "secretAccessKey" "bucket" "batchExport" "values" .Values.s3) ) }}
@@ -400,7 +513,14 @@ Get value of a specific environment variable from additionalEnv if it exists
 {{- else }}
 {{- if .Values.s3.deploy }}
 - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
+  {{- if and .Values.s3.auth.existingSecret .Values.s3.auth.rootPasswordSecretKey }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.s3.auth.existingSecret }}
+      key: {{ .Values.s3.auth.rootPasswordSecretKey }}
+  {{- else }}
   value: {{ .Values.s3.auth.rootPassword | quote }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- if or (hasKey .Values.s3.batchExport "forcePathStyle") (hasKey .Values.s3 "forcePathStyle") }}
@@ -422,9 +542,9 @@ Get value of a specific environment variable from additionalEnv if it exists
 - name: LANGFUSE_S3_MEDIA_UPLOAD_REGION
   value: {{ .Values.s3.mediaUpload.region | default .Values.s3.region | quote }}
 {{- end }}
-{{- with (include "langfuse.s3.endpoint" .) }}
+{{- if or .Values.s3.mediaUpload.endpoint .Values.s3.endpoint .Values.s3.deploy }}
 - name: LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT
-  value: {{ . | quote }}
+  value: {{ .Values.s3.mediaUpload.endpoint | default .Values.s3.endpoint | default (include "langfuse.s3.endpoint" .) | quote }}
 {{- end }}
 {{- with (include "langfuse.getS3ValueOrSecret" (dict "key" "accessKeyId" "bucket" "mediaUpload" "values" .Values.s3) ) }}
 - name: LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID
@@ -432,7 +552,14 @@ Get value of a specific environment variable from additionalEnv if it exists
 {{- else }}
 {{- if .Values.s3.deploy }}
 - name: LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID
+  {{- if and .Values.s3.auth.existingSecret .Values.s3.auth.rootUserSecretKey }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.s3.auth.existingSecret }}
+      key: {{ .Values.s3.auth.rootUserSecretKey }}
+  {{- else }}
   value: {{ .Values.s3.auth.rootUser | quote }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- with (include "langfuse.getS3ValueOrSecret" (dict "key" "secretAccessKey" "bucket" "mediaUpload" "values" .Values.s3) ) }}
@@ -441,7 +568,14 @@ Get value of a specific environment variable from additionalEnv if it exists
 {{- else }}
 {{- if .Values.s3.deploy }}
 - name: LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY
+  {{- if and .Values.s3.auth.existingSecret .Values.s3.auth.rootPasswordSecretKey }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.s3.auth.existingSecret }}
+      key: {{ .Values.s3.auth.rootPasswordSecretKey }}
+  {{- else }}
   value: {{ .Values.s3.auth.rootPassword | quote }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- if or (hasKey .Values.s3.mediaUpload "forcePathStyle") (hasKey .Values.s3 "forcePathStyle") }}
