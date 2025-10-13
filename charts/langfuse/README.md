@@ -1,6 +1,6 @@
 # langfuse
 
-![Version: 1.5.0](https://img.shields.io/badge/Version-1.5.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.100.0](https://img.shields.io/badge/AppVersion-3.100.0-informational?style=flat-square)
+![Version: 1.5.1](https://img.shields.io/badge/Version-1.5.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.117.2](https://img.shields.io/badge/AppVersion-3.117.2-informational?style=flat-square)
 
 Open source LLM engineering platform - LLM observability, metrics, evaluations, prompt management.
 
@@ -31,32 +31,68 @@ Open source LLM engineering platform - LLM observability, metrics, evaluations, 
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| clickhouse.auth.existingSecret | string | `""` | If you want to use an existing secret for the ClickHouse password, set the name of the secret here. (`clickhouse.auth.username` and `clickhouse.auth.password` will be ignored and picked up from this secret). |
-| clickhouse.auth.existingSecretKey | string | `""` | The key in the existing secret that contains the password. |
+| clickhouse.auth.existingSecret | string | `"langfuse-secrets-prod"` | If you want to use an existing secret for the ClickHouse password, set the name of the secret here. (`clickhouse.auth.username` and `clickhouse.auth.password` will be ignored and picked up from this secret). |
+| clickhouse.auth.existingSecretKey | string | `"CLICKHOUSE_PASSWORD"` | The key in the existing secret that contains the password. |
 | clickhouse.auth.password | string | `""` | Password for the ClickHouse user. |
-| clickhouse.auth.username | string | `"default"` | Username for the ClickHouse user. |
-| clickhouse.clusterEnabled | bool | `true` | Whether to run ClickHouse commands ON CLUSTER |
+| clickhouse.auth.username | string | `"clickhouse"` | Username for the ClickHouse user. |
+| clickhouse.clusterEnabled | bool | `false` | Whether to run ClickHouse commands ON CLUSTER |
 | clickhouse.deploy | bool | `true` | Enable ClickHouse deployment (via Bitnami Helm Chart). If you want to use an external Clickhouse server (or a managed one), set this to false |
 | clickhouse.host | string | `""` | ClickHouse host to connect to. If clickhouse.deploy is true, this will be set automatically based on the release name. |
 | clickhouse.httpPort | int | `8123` | ClickHouse HTTP port to connect to. |
-| clickhouse.image.repository | string | `"bitnamilegacy/clickhouse"` | Overwrite default repository of helm chart to point to non-paid bitnami images. |
+| clickhouse.logPersistence.enabled | bool | `true` |  |
+| clickhouse.logPersistence.size | string | `"30Gi"` |  |
 | clickhouse.migration.autoMigrate | bool | `true` | Whether to run automatic ClickHouse migrations on startup |
 | clickhouse.migration.ssl | bool | `false` | Set to true to establish SSL connection for migration |
 | clickhouse.migration.url | string | `""` | Migration URL (TCP protocol) for clickhouse |
 | clickhouse.nativePort | int | `9000` | ClickHouse native port to connect to. |
-| clickhouse.replicaCount | int | `3` | Number of replicas to use for the ClickHouse cluster. 1 corresponds to a single, non-HA deployment. |
+| clickhouse.nodeSelector.if-llm-workload | string | `"true"` |  |
+| clickhouse.persistence.size | string | `"50Gi"` |  |
+| clickhouse.replicaCount | int | `1` | Number of replicas to use for the ClickHouse cluster. 1 corresponds to a single, non-HA deployment. |
 | clickhouse.resourcesPreset | string | `"2xlarge"` | The resources preset to use for the ClickHouse cluster. |
 | clickhouse.shards | int | `1` | Subchart specific settings |
-| clickhouse.zookeeper.image.repository | string | `"bitnamilegacy/zookeeper"` | Overwrite default repository of helm chart to point to non-paid bitnami images. |
+| clickhouse.tolerations[0].effect | string | `"NoSchedule"` |  |
+| clickhouse.tolerations[0].key | string | `"if-monitoring-pod"` |  |
+| clickhouse.tolerations[0].operator | string | `"Equal"` |  |
+| clickhouse.tolerations[0].value | string | `"true"` |  |
+| clickhouse.tolerations[1].effect | string | `"NoSchedule"` |  |
+| clickhouse.tolerations[1].key | string | `"if-llm-workload"` |  |
+| clickhouse.tolerations[1].operator | string | `"Equal"` |  |
+| clickhouse.tolerations[1].value | string | `"true"` |  |
+| clickhouse.zookeeper.nodeSelector.if-llm-workload | string | `"true"` |  |
+| clickhouse.zookeeper.tolerations[0].effect | string | `"NoSchedule"` |  |
+| clickhouse.zookeeper.tolerations[0].key | string | `"if-llm-workload"` |  |
+| clickhouse.zookeeper.tolerations[0].operator | string | `"Equal"` |  |
+| clickhouse.zookeeper.tolerations[0].value | string | `"true"` |  |
+| clickhouse.zookeeper.tolerations[1].effect | string | `"NoSchedule"` |  |
+| clickhouse.zookeeper.tolerations[1].key | string | `"if-monitoring-pod"` |  |
+| clickhouse.zookeeper.tolerations[1].operator | string | `"Equal"` |  |
+| clickhouse.zookeeper.tolerations[1].value | string | `"true"` |  |
 | extraManifests | list | `[]` |  |
 | fullnameOverride | string | `""` | Override the full name of the deployed resources, defaults to a combination of the release name and the name for the selector labels |
 | global.security.allowInsecureImages | bool | `true` | Allow insecure images to use bitnami legacy repository. Can be set to false if secure images are being used (Paid). |
+| global.storageClass | string | `"gp2"` |  |
 | langfuse.additionalEnv | list | `[]` | List of additional environment variables to be added to all langfuse deployments. See [documentation](https://langfuse.com/docs/deployment/self-host#configuring-environment-variables) for details. |
-| langfuse.affinity | object | `{}` | Affinity for all langfuse deployments |
+| langfuse.additionalEnv[0].name | string | `"SMTP_HOST"` |  |
+| langfuse.additionalEnv[0].value | string | `"smtp.gmail.com"` |  |
+| langfuse.additionalEnv[1].name | string | `"SMTP_PORT"` |  |
+| langfuse.additionalEnv[1].value | string | `"587"` |  |
+| langfuse.additionalEnv[2].name | string | `"SMTP_SECURE"` |  |
+| langfuse.additionalEnv[2].value | string | `"false"` |  |
+| langfuse.additionalEnv[3].name | string | `"SMTP_AUTH_USER"` |  |
+| langfuse.additionalEnv[3].valueFrom.secretKeyRef.key | string | `"SMTP_USER"` |  |
+| langfuse.additionalEnv[3].valueFrom.secretKeyRef.name | string | `"langfuse-secrets-prod"` |  |
+| langfuse.additionalEnv[4].name | string | `"SMTP_AUTH_PASSWORD"` |  |
+| langfuse.additionalEnv[4].valueFrom.secretKeyRef.key | string | `"SMTP_PASSWORD"` |  |
+| langfuse.additionalEnv[4].valueFrom.secretKeyRef.name | string | `"langfuse-secrets-prod"` |  |
+| langfuse.additionalEnv[5].name | string | `"EMAIL_FROM_ADDRESS"` |  |
+| langfuse.additionalEnv[5].value | string | `"langfuse@partner.drivex.in"` |  |
+| langfuse.additionalEnv[6].name | string | `"EMAIL_FROM_NAME"` |  |
+| langfuse.additionalEnv[6].value | string | `"Langfuse Notifications"` |  |
+| langfuse.affinity | object | `{}` |  |
 | langfuse.allowedOrganizationCreators | list | `[]` | EE: Langfuse allowed organization creators. See [documentation](https://langfuse.com/self-hosting/organization-creators) |
 | langfuse.deployment.annotations | object | `{}` | Annotations for all langfuse deployments |
 | langfuse.deployment.strategy | object | `{}` | Deployment strategy for all langfuse deployments (can be overridden by individual deployments) |
-| langfuse.encryptionKey | object | `{"secretKeyRef":{"key":"","name":""},"value":""}` | Used to encrypt sensitive data. Must be 256 bits (64 string characters in hex format). Generate via `openssl rand -hex 32`. |
+| langfuse.encryptionKey | object | `{"secretKeyRef":{"key":"ENCRYPTION_KEY","name":"langfuse-secrets-prod"}}` | Used to encrypt sensitive data. Must be 256 bits (64 string characters in hex format). Generate via `openssl rand -hex 32`. |
 | langfuse.extraContainers | list | `[]` | Allows additional containers to be added to all langfuse deployments |
 | langfuse.extraInitContainers | list | `[]` | Allows additional init containers to be added to all langfuse deployments |
 | langfuse.extraLifecycle | object | `{}` | Allows additional lifecycle hooks to be added to all langfuse deployments |
@@ -69,40 +105,46 @@ Open source LLM engineering platform - LLM observability, metrics, evaluations, 
 | langfuse.image.pullSecrets | list | `[]` | The pull secrets to use for all langfuse deployments. Can be overridden by the individual deployments. |
 | langfuse.image.tag | string | `nil` | The image tag to use for all langfuse deployments. Can be overridden by the individual deployments. Falls back to appVersion if not set. |
 | langfuse.ingress.additionalLabels | object | `{}` | Additional labels for the ingress resource |
-| langfuse.ingress.annotations | object | `{}` | Annotations for the ingress resource |
-| langfuse.ingress.className | string | `""` | The class name for the ingress resource |
-| langfuse.ingress.enabled | bool | `false` | Set to `true` to enable the ingress resource |
-| langfuse.ingress.hosts | list | `[]` | The hosts for the ingress resource |
-| langfuse.ingress.tls.enabled | bool | `false` | Set to `true` to enable use HTTPS on the ingress |
-| langfuse.ingress.tls.secretName | string | `""` | The name of the secret to use for TLS Key |
+| langfuse.ingress.annotations | object | `{"cert-manager.io/cluster-issuer":"letsencrypt-prod","kubernetes.io/ingress.class":"nginx","kubernetes.io/tls-acme":"true","nginx.ingress.kubernetes.io/use-forwarded-headers":"true"}` | Annotations for the ingress resource |
+| langfuse.ingress.className | string | `"nginx"` | The class name for the ingress resource |
+| langfuse.ingress.enabled | bool | `true` | Set to `true` to enable the ingress resource |
+| langfuse.ingress.hosts | list | `[{"host":"llmmetrics.drivex.in","paths":[{"path":"/","pathType":"ImplementationSpecific"}]}]` | The hosts for the ingress resource |
+| langfuse.ingress.tls.enabled | bool | `true` | Set to `true` to enable use HTTPS on the ingress |
+| langfuse.ingress.tls.secretName | string | `"langfuse-prod-tls"` | The name of the secret to use for TLS Key |
 | langfuse.licenseKey | object | `{"secretKeyRef":{"key":"","name":""},"value":""}` | Langfuse EE license key. |
 | langfuse.logging.format | string | `"text"` | Set the log format for the application (text or json) |
 | langfuse.logging.level | string | `"info"` | Set the log level for the application (trace, debug, info, warn, error, fatal) |
-| langfuse.nextauth.secret | object | `{"secretKeyRef":{"key":"","name":""},"value":""}` | Used to encrypt the NextAuth.js JWT, and to hash email verification tokens. Can be configured by value or existing secret reference. |
-| langfuse.nextauth.url | string | `"http://localhost:3000"` | When deploying to production, set the `nextauth.url` value to the canonical URL of your site. |
+| langfuse.nextauth.secret | object | `{"secretKeyRef":{"key":"NEXTAUTH_SECRET","name":"langfuse-secrets-prod"}}` | Used to encrypt the NextAuth.js JWT, and to hash email verification tokens. Can be configured by value or existing secret reference. |
+| langfuse.nextauth.url | string | `"https://llmmetrics.drivex.in"` | When deploying to production, set the `nextauth.url` value to the canonical URL of your site. |
 | langfuse.nodeEnv | string | `"production"` | Node.js environment to use for all langfuse deployments |
-| langfuse.nodeSelector | object | `{}` | Node selector for all langfuse deployments |
+| langfuse.nodeSelector.if-llm-workload | string | `"true"` |  |
 | langfuse.pod.annotations | object | `{}` | Annotations for all langfuse pods |
 | langfuse.pod.labels | object | `{}` | Labels for all langfuse pods |
-| langfuse.pod.topologySpreadConstraints | list | `[]` | Topology spread constraints for all langfuse pods |
 | langfuse.podSecurityContext | object | `{}` | Pod security context for all langfuse deployments |
 | langfuse.replicas | int | `1` | Number of replicas to use for all langfuse deployments. Can be overridden by the individual deployments |
-| langfuse.resources | object | `{}` | Resources for all langfuse deployments. Can be overridden by the individual deployments |
+| langfuse.resources | object | `{"limits":{"cpu":"1000m","memory":"1Gi"},"requests":{"cpu":"500m","memory":"512Mi"}}` | Resources for all langfuse deployments. Can be overridden by the individual deployments |
 | langfuse.revisionHistoryLimit | int | `10` | Number of old ReplicaSets to retain to allow rollback. Can be overridden by the individual deployments |
-| langfuse.salt | object | `{"secretKeyRef":{"key":"","name":""},"value":""}` | Used to hash API keys. Can be configured by value or existing secret reference. To generate a new salt, run `openssl rand -base64 32`. |
+| langfuse.salt | object | `{"secretKeyRef":{"key":"SALT","name":"langfuse-secrets-prod"}}` | Used to hash API keys. Can be configured by value or existing secret reference. To generate a new salt, run `openssl rand -base64 32`. |
 | langfuse.securityContext | object | `{}` | Security context for all langfuse deployments |
 | langfuse.serviceAccount.annotations | object | `{}` | Annotations for the service account |
 | langfuse.serviceAccount.create | bool | `true` | Whether to create a service account for all langfuse deployments |
 | langfuse.serviceAccount.name | string | `""` | Override the name of the service account to use, discovered automatically if not set |
 | langfuse.smtp.connectionUrl | string | `""` | SMTP connection URL. See [documentation](https://langfuse.com/self-hosting/transactional-emails) |
 | langfuse.smtp.fromAddress | string | `""` | From address for emails. Required if connectionUrl is set. |
-| langfuse.tolerations | list | `[]` | Tolerations for all langfuse deployments |
+| langfuse.tolerations[0].effect | string | `"NoSchedule"` |  |
+| langfuse.tolerations[0].key | string | `"if-monitoring-pod"` |  |
+| langfuse.tolerations[0].operator | string | `"Equal"` |  |
+| langfuse.tolerations[0].value | string | `"true"` |  |
+| langfuse.tolerations[1].effect | string | `"NoSchedule"` |  |
+| langfuse.tolerations[1].key | string | `"if-llm-workload"` |  |
+| langfuse.tolerations[1].operator | string | `"Equal"` |  |
+| langfuse.tolerations[1].value | string | `"true"` |  |
 | langfuse.web.deployment.additionalLabels | object | `{}` | Additional labels for the langfuse web deployment |
 | langfuse.web.deployment.annotations | object | `{}` | Annotations for the web deployment |
 | langfuse.web.deployment.strategy | object | `{}` | Deployment strategy for the web deployment. Overrides the global deployment strategy |
 | langfuse.web.hostAliases | list | `[]` | Adding records to /etc/hosts in the pod's network. |
-| langfuse.web.hpa.enabled | bool | `false` | Set to `true` to enable HPA for the langfuse web pods Note: When both KEDA and HPA are enabled, the deployment will fail. |
-| langfuse.web.hpa.maxReplicas | int | `2` | The maximum number of replicas to use for the langfuse web pods |
+| langfuse.web.hpa.enabled | bool | `true` | Set to `true` to enable HPA for the langfuse web pods Note: When both KEDA and HPA are enabled, the deployment will fail. |
+| langfuse.web.hpa.maxReplicas | int | `3` | The maximum number of replicas to use for the langfuse web pods |
 | langfuse.web.hpa.minReplicas | int | `1` | The minimum number of replicas to use for the langfuse web pods |
 | langfuse.web.hpa.targetCPUUtilizationPercentage | int | `50` | The target CPU utilization percentage for the langfuse web pods |
 | langfuse.web.image.pullPolicy | string | `nil` | The pull policy to use for the langfuse web pods. Using `langfuse.image.pullPolicy` if not set. |
@@ -123,6 +165,7 @@ Open source LLM engineering platform - LLM observability, metrics, evaluations, 
 | langfuse.web.livenessProbe.periodSeconds | int | `10` | Period seconds for livenessProbe. |
 | langfuse.web.livenessProbe.successThreshold | int | `1` | Success threshold for livenessProbe. |
 | langfuse.web.livenessProbe.timeoutSeconds | int | `5` | Timeout seconds for livenessProbe. |
+| langfuse.web.nodeSelector.if-llm-workload | string | `"true"` |  |
 | langfuse.web.pod.additionalEnv | list | `[]` | List of additional environment variables to be added to all langfuse web pods. See [documentation](https://langfuse.com/docs/deployment/self-host#configuring-environment-variables) for details. |
 | langfuse.web.pod.annotations | object | `{}` | Annotations for the web pods |
 | langfuse.web.pod.extraContainers | list | `[]` | Allows additional containers to be added to all langfuse web pods |
@@ -143,6 +186,14 @@ Open source LLM engineering platform - LLM observability, metrics, evaluations, 
 | langfuse.web.service.nodePort | string | `nil` | The node port to use for the langfuse web application |
 | langfuse.web.service.port | int | `3000` | The port to use for the langfuse web application |
 | langfuse.web.service.type | string | `"ClusterIP"` | The type of service to use for the langfuse web application |
+| langfuse.web.tolerations[0].effect | string | `"NoSchedule"` |  |
+| langfuse.web.tolerations[0].key | string | `"if-monitoring-pod"` |  |
+| langfuse.web.tolerations[0].operator | string | `"Equal"` |  |
+| langfuse.web.tolerations[0].value | string | `"true"` |  |
+| langfuse.web.tolerations[1].effect | string | `"NoSchedule"` |  |
+| langfuse.web.tolerations[1].key | string | `"if-llm-workload"` |  |
+| langfuse.web.tolerations[1].operator | string | `"Equal"` |  |
+| langfuse.web.tolerations[1].value | string | `"true"` |  |
 | langfuse.web.vpa.controlledResources | list | `[]` | The resources to control for the langfuse web pods |
 | langfuse.web.vpa.enabled | bool | `false` | Set to `true` to enable VPA for the langfuse web pods |
 | langfuse.web.vpa.maxAllowed | object | `{}` | The maximum allowed resources for the langfuse web pods |
@@ -151,8 +202,8 @@ Open source LLM engineering platform - LLM observability, metrics, evaluations, 
 | langfuse.worker.deployment.additionalLabels | object | `{}` | Additional labels for the worker deployment |
 | langfuse.worker.deployment.annotations | object | `{}` | Annotations for the worker deployment |
 | langfuse.worker.deployment.strategy | object | `{}` | Deployment strategy for the worker deployment. Overrides the global deployment strategy |
-| langfuse.worker.hpa.enabled | bool | `false` | Set to `true` to enable HPA for the langfuse worker pods Note: When both KEDA and HPA are enabled, the deployment will fail. |
-| langfuse.worker.hpa.maxReplicas | int | `2` | The maximum number of replicas to use for the langfuse worker pods |
+| langfuse.worker.hpa.enabled | bool | `true` | Set to `true` to enable HPA for the langfuse worker pods Note: When both KEDA and HPA are enabled, the deployment will fail. |
+| langfuse.worker.hpa.maxReplicas | int | `5` | The maximum number of replicas to use for the langfuse worker pods |
 | langfuse.worker.hpa.minReplicas | int | `1` | The minimum number of replicas to use for the langfuse worker pods |
 | langfuse.worker.hpa.targetCPUUtilizationPercentage | int | `50` | The target CPU utilization percentage for the langfuse worker pods |
 | langfuse.worker.image.pullPolicy | string | `nil` | The pull policy to use for the langfuse worker pods. Using `langfuse.image.pullPolicy` if not set. |
@@ -172,6 +223,7 @@ Open source LLM engineering platform - LLM observability, metrics, evaluations, 
 | langfuse.worker.livenessProbe.periodSeconds | int | `10` | Period seconds for livenessProbe. |
 | langfuse.worker.livenessProbe.successThreshold | int | `1` | Success threshold for livenessProbe. |
 | langfuse.worker.livenessProbe.timeoutSeconds | int | `5` | Timeout seconds for livenessProbe. |
+| langfuse.worker.nodeSelector.if-llm-workload | string | `"true"` |  |
 | langfuse.worker.pod.additionalEnv | list | `[]` | List of additional environment variables to be added to all langfuse worker pods. See [documentation](https://langfuse.com/docs/deployment/self-host#configuring-environment-variables) for details. |
 | langfuse.worker.pod.annotations | object | `{}` | Annotations for the worker pods |
 | langfuse.worker.pod.extraContainers | list | `[]` | Allows additional containers to be added to all langfuse worker pods |
@@ -180,6 +232,14 @@ Open source LLM engineering platform - LLM observability, metrics, evaluations, 
 | langfuse.worker.replicas | string | `nil` | Number of replicas to use if HPA is not enabled. Defaults to the global replicas |
 | langfuse.worker.resources | object | `{}` | Resources for the langfuse worker pods. Defaults to the global resources |
 | langfuse.worker.revisionHistoryLimit | string | `nil` | Number of old ReplicaSets to retain to allow rollback. |
+| langfuse.worker.tolerations[0].effect | string | `"NoSchedule"` |  |
+| langfuse.worker.tolerations[0].key | string | `"if-monitoring-pod"` |  |
+| langfuse.worker.tolerations[0].operator | string | `"Equal"` |  |
+| langfuse.worker.tolerations[0].value | string | `"true"` |  |
+| langfuse.worker.tolerations[1].effect | string | `"NoSchedule"` |  |
+| langfuse.worker.tolerations[1].key | string | `"if-llm-workload"` |  |
+| langfuse.worker.tolerations[1].operator | string | `"Equal"` |  |
+| langfuse.worker.tolerations[1].value | string | `"true"` |  |
 | langfuse.worker.vpa.controlledResources | list | `[]` | The resources to control for the langfuse worker pods |
 | langfuse.worker.vpa.enabled | bool | `false` | Set to `true` to enable VPA for the langfuse worker pods |
 | langfuse.worker.vpa.maxAllowed | object | `{}` | The maximum allowed resources for the langfuse worker pods |
@@ -189,35 +249,47 @@ Open source LLM engineering platform - LLM observability, metrics, evaluations, 
 | postgresql.architecture | string | `"standalone"` |  |
 | postgresql.args | string | `""` | Additional database connection arguments |
 | postgresql.auth.args | string | `""` | Additional database connection arguments |
-| postgresql.auth.database | string | `"postgres_langfuse"` | Database name to use for Langfuse. |
-| postgresql.auth.existingSecret | string | `""` | If you want to use an existing secret for the postgres password, set the name of the secret here. (`postgresql.auth.username` and `postgresql.auth.password` will be ignored and picked up from this secret). |
+| postgresql.auth.database | string | `"langfuse_prod"` | Database name to use for Langfuse. |
+| postgresql.auth.existingSecret | string | `"langfuse-postgres-credentials-prod"` | If you want to use an existing secret for the postgres password, set the name of the secret here. (`postgresql.auth.username` and `postgresql.auth.password` will be ignored and picked up from this secret). |
 | postgresql.auth.password | string | `""` | Password to use to connect to the postgres database deployed with Langfuse. In case `postgresql.deploy` is set to `true`, the password will be set automatically. |
-| postgresql.auth.secretKeys | object | `{"userPasswordKey":"password"}` | The key in the existing secret that contains the password. |
+| postgresql.auth.secretKeys | object | `{"postgresPasswordKey":"password"}` | The key in the existing secret that contains the password. |
 | postgresql.auth.username | string | `"postgres"` | Username to use to connect to the postgres database deployed with Langfuse. In case `postgresql.deploy` is set to `true`, the user will be created automatically. |
 | postgresql.deploy | bool | `true` | Enable PostgreSQL deployment (via Bitnami Helm Chart). If you want to use an external Postgres server (or a managed one), set this to false |
 | postgresql.directUrl | string | `""` | If `postgresql.deploy` is set to false, Connection string of your Postgres database used for database migrations. Use this if you want to use a different user for migrations or use connection pooling on DATABASE_URL. For large deployments, configure the database user with long timeouts as migrations might need a while to complete. |
 | postgresql.host | string | `""` | PostgreSQL host to connect to. If postgresql.deploy is true, this will be set automatically based on the release name. |
-| postgresql.image.repository | string | `"bitnamilegacy/postgresql"` | Overwrite default repository of helm chart to point to non-paid bitnami images. |
 | postgresql.migration.autoMigrate | bool | `true` | Whether to run automatic migrations on startup |
-| postgresql.port | string | `nil` | Port of the postgres server to use. Defaults to 5432. |
+| postgresql.port | int | `5432` | Port of the postgres server to use. Defaults to 5432. |
+| postgresql.primary.nodeSelector.if-llm-workload | string | `"true"` |  |
+| postgresql.primary.persistence.enabled | bool | `true` |  |
+| postgresql.primary.persistence.selector | object | `{}` |  |
+| postgresql.primary.persistence.size | string | `"50Gi"` |  |
 | postgresql.primary.service.ports.postgresql | int | `5432` |  |
+| postgresql.primary.tolerations[0].effect | string | `"NoSchedule"` |  |
+| postgresql.primary.tolerations[0].key | string | `"if-monitoring-pod"` |  |
+| postgresql.primary.tolerations[0].operator | string | `"Equal"` |  |
+| postgresql.primary.tolerations[0].value | string | `"true"` |  |
+| postgresql.primary.tolerations[1].effect | string | `"NoSchedule"` |  |
+| postgresql.primary.tolerations[1].key | string | `"if-llm-workload"` |  |
+| postgresql.primary.tolerations[1].operator | string | `"Equal"` |  |
+| postgresql.primary.tolerations[1].value | string | `"true"` |  |
 | postgresql.shadowDatabaseUrl | string | `""` | If your database user lacks the CREATE DATABASE permission, you must create a shadow database and configure the "SHADOW_DATABASE_URL". This is often the case if you use a Cloud database. Refer to the Prisma docs for detailed instructions. |
 | redis.architecture | string | `"standalone"` |  |
 | redis.auth.database | int | `0` |  |
-| redis.auth.existingSecret | string | `""` | If you want to use an existing secret for the redis password, set the name of the secret here. (`redis.auth.password` will be ignored and picked up from this secret). |
-| redis.auth.existingSecretPasswordKey | string | `""` | The key in the existing secret that contains the password. |
+| redis.auth.existingSecret | string | `"langfuse-secrets-prod"` | If you want to use an existing secret for the redis password, set the name of the secret here. (`redis.auth.password` will be ignored and picked up from this secret). |
+| redis.auth.existingSecretPasswordKey | string | `"REDIS_PASSWORD"` | The key in the existing secret that contains the password. |
 | redis.auth.password | string | `""` | Configure the password by value or existing secret reference. Use URL-encoded passwords or avoid special characters in the password. |
 | redis.auth.username | string | `"default"` | Username to use to connect to the redis database deployed with Langfuse. In case `redis.deploy` is set to `true`, the user will be created automatically. Set to null for an empty username in the connection string. |
 | redis.deploy | bool | `true` | Enable valkey deployment (via Bitnami Helm Chart). If you want to use a Redis or Valkey server already deployed, set to false. |
 | redis.host | string | `""` | Redis host to connect to. If redis.deploy is true, this will be set automatically based on the release name. |
-| redis.image.repository | string | `"bitnamilegacy/valkey"` | Overwrite default repository of helm chart to point to non-paid bitnami images. |
 | redis.port | int | `6379` | Redis port to connect to. |
 | redis.primary.extraFlags | list | `["--maxmemory-policy noeviction"]` | Extra flags for the valkey deployment. Must include `--maxmemory-policy noeviction`. |
 | redis.tls.caPath | string | `""` | Path to the CA certificate file for TLS verification |
 | redis.tls.certPath | string | `""` | Path to the client certificate file for mutual TLS authentication |
 | redis.tls.enabled | bool | `false` | Set to `true` to enable TLS/SSL encrypted connection to the Redis server |
 | redis.tls.keyPath | string | `""` | Path to the client private key file for mutual TLS authentication |
-| s3.accessKeyId | object | `{"secretKeyRef":{"key":"","name":""},"value":""}` | S3 accessKeyId to use for all uploads. Can be overridden per upload type. |
+| s3.accessKeyId | object | `{"secretKeyRef":{"key":"S3_ACCESS_KEY_ID","name":"langfuse-secrets-prod"}}` | S3 accessKeyId to use for all uploads. Can be overridden per upload type. |
+| s3.accessKeyId.secretKeyRef.key | string | `"S3_ACCESS_KEY_ID"` |  |
+| s3.accessKeyId.secretKeyRef.name | string | `"langfuse-secrets-prod"` |  |
 | s3.auth.existingSecret | string | `""` | If you want to use an existing secret for the root user password, set the name of the secret here. (`s3.auth.rootUser` and `s3.auth.rootPassword` will be ignored and picked up from this secret). |
 | s3.auth.rootPassword | string | `""` | Password for MinIO root user |
 | s3.auth.rootPasswordSecretKey | string | `""` | Key where the Minio root user password is being stored inside the existing secret `s3.auth.existingSecret` |
@@ -228,25 +300,26 @@ Open source LLM engineering platform - LLM observability, metrics, evaluations, 
 | s3.batchExport.enabled | bool | `true` | Enable batch export. |
 | s3.batchExport.endpoint | string | `""` | S3 endpoint to use for batch exports. |
 | s3.batchExport.forcePathStyle | string | `nil` | Whether to force path style on requests. Required for MinIO. |
+| s3.batchExport.prefix | string | `"exports/"` |  |
 | s3.batchExport.prefix | string | `""` | Prefix to use for batch exports within the bucket. |
 | s3.batchExport.region | string | `""` | S3 region to use for batch exports. |
 | s3.batchExport.secretAccessKey | object | `{"secretKeyRef":{"key":"","name":""},"value":""}` | S3 secretAccessKey to use for batch exports. |
-| s3.bucket | string | `""` | S3 bucket to use for all uploads. Can be overridden per upload type. |
+| s3.bucket | string | `"langfuse-production"` | S3 bucket to use for all uploads. Can be overridden per upload type. |
 | s3.concurrency.reads | int | `50` | Maximum number of concurrent read operations to S3. Defaults to 50. |
 | s3.concurrency.writes | int | `50` | Maximum number of concurrent write operations to S3. Defaults to 50. |
 | s3.defaultBuckets | string | `"langfuse"` |  |
-| s3.deploy | bool | `true` | Enable MinIO deployment (via Bitnami Helm Chart). If you want to use a custom BlobStorage, e.g. S3, set to false. |
-| s3.endpoint | string | `""` | S3 endpoint to use for all uploads. Can be overridden per upload type. |
+| s3.deploy | bool | `false` | Enable MinIO deployment (via Bitnami Helm Chart). If you want to use a custom BlobStorage, e.g. S3, set to false. |
+| s3.endpoint | string | `"https://s3.ap-south-2.amazonaws.com"` | S3 endpoint to use for all uploads. Can be overridden per upload type. |
 | s3.eventUpload.accessKeyId | object | `{"secretKeyRef":{"key":"","name":""},"value":""}` | S3 accessKeyId to use for event uploads. |
 | s3.eventUpload.bucket | string | `""` | S3 bucket to use for event uploads. |
 | s3.eventUpload.endpoint | string | `""` | S3 endpoint to use for event uploads. |
 | s3.eventUpload.forcePathStyle | string | `nil` | Whether to force path style on requests. Required for MinIO. |
 | s3.eventUpload.prefix | string | `""` | Prefix to use for event uploads within the bucket. |
+| s3.eventUpload.prefix | string | `"events/"` |  |
 | s3.eventUpload.region | string | `""` | S3 region to use for event uploads. |
 | s3.eventUpload.secretAccessKey | object | `{"secretKeyRef":{"key":"","name":""},"value":""}` | S3 secretAccessKey to use for event uploads. |
 | s3.forcePathStyle | bool | `true` | Whether to force path style on requests. Required for MinIO. Can be overridden per upload type. |
-| s3.gcs.credentials | object | `{"secretKeyRef":{"key":"","name":""},"value":""}` | Example: Set value to the JSON service account key content, or use secretKeyRef to reference a secret |
-| s3.image.repository | string | `"bitnamilegacy/minio"` | Overwrite default repository of helm chart to point to non-paid bitnami images. |
+| s3.forcePathStyle | bool | `false` |  |
 | s3.mediaUpload.accessKeyId | object | `{"secretKeyRef":{"key":"","name":""},"value":""}` | S3 accessKeyId to use for media uploads. |
 | s3.mediaUpload.bucket | string | `""` | S3 bucket to use for media uploads. |
 | s3.mediaUpload.downloadUrlExpirySeconds | int | `3600` | Expiry time for download URLs. Defaults to 1 hour. |
@@ -255,11 +328,33 @@ Open source LLM engineering platform - LLM observability, metrics, evaluations, 
 | s3.mediaUpload.forcePathStyle | string | `nil` | Whether to force path style on requests. Required for MinIO. |
 | s3.mediaUpload.maxContentLength | int | `1000000000` | Maximum content length for media uploads. Defaults to 1GB. |
 | s3.mediaUpload.prefix | string | `""` | Prefix to use for media uploads within the bucket. |
+| s3.mediaUpload.prefix | string | `"media/"` |  |
 | s3.mediaUpload.region | string | `""` | S3 region to use for media uploads. |
 | s3.mediaUpload.secretAccessKey | object | `{"secretKeyRef":{"key":"","name":""},"value":""}` | S3 secretAccessKey to use for media uploads. |
-| s3.region | string | `"auto"` | S3 region to use for all uploads. Can be overridden per upload type. |
-| s3.secretAccessKey | object | `{"secretKeyRef":{"key":"","name":""},"value":""}` | S3 secretAccessKey to use for all uploads. Can be overridden per upload type. |
+| s3.nodeSelector.if-llm-workload | string | `"true"` |  |
+| s3.persistence.size | string | `"50Gi"` |  |
+| s3.region | string | `"ap-south-2"` | S3 region to use for all uploads. Can be overridden per upload type. |
+| s3.secretAccessKey | object | `{"secretKeyRef":{"key":"S3_SECRET_ACCESS_KEY","name":"langfuse-secrets-prod"}}` | S3 secretAccessKey to use for all uploads. Can be overridden per upload type. |
+| s3.secretAccessKey.secretKeyRef.key | string | `"S3_SECRET_ACCESS_KEY"` |  |
+| s3.secretAccessKey.secretKeyRef.name | string | `"langfuse-secrets-prod"` |  |
 | s3.storageProvider | string | `"s3"` | When set to 's3', uses S3-compatible interface (default behavior) |
+| s3.tolerations[0].effect | string | `"NoSchedule"` |  |
+| s3.tolerations[0].key | string | `"if-monitoring-pod"` |  |
+| s3.tolerations[0].operator | string | `"Equal"` |  |
+| s3.tolerations[0].value | string | `"true"` |  |
+| s3.tolerations[1].effect | string | `"NoSchedule"` |  |
+| s3.tolerations[1].key | string | `"if-llm-workload"` |  |
+| s3.tolerations[1].operator | string | `"Equal"` |  |
+| s3.tolerations[1].value | string | `"true"` |  |
+| zookeeper.nodeSelector.if-llm-workload | string | `"true"` |  |
+| zookeeper.tolerations[0].effect | string | `"NoSchedule"` |  |
+| zookeeper.tolerations[0].key | string | `"if-monitoring-pod"` |  |
+| zookeeper.tolerations[0].operator | string | `"Equal"` |  |
+| zookeeper.tolerations[0].value | string | `"true"` |  |
+| zookeeper.tolerations[1].effect | string | `"NoSchedule"` |  |
+| zookeeper.tolerations[1].key | string | `"if-llm-workload"` |  |
+| zookeeper.tolerations[1].operator | string | `"Equal"` |  |
+| zookeeper.tolerations[1].value | string | `"true"` |  |
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)
